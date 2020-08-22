@@ -1,30 +1,53 @@
 import scrapy
 
+
 class Quotes(scrapy.Spider):
-	name = 'quotes'
-	start_urls = [ 
-		'http://quotes.toscrape.com/'
-	]
+    name = 'quotes'
 
-	def parse(self, response, **kwargs):
-		title = response.css('h1 a::text').get()
-		quotes = response.css('.text::text').getall()
-		top_tags = response.css('.tag-item .tag::text').getall()
+    custom_settings = {
+        'FEED_URI': 'quotes.json',
+        'FEED_FORMAT': 'json'
+    }
 
-		print('*'*10)
-		print('\n\n')
+    start_urls = [
+        'http://quotes.toscrape.com/'
+    ]
 
-		print(f'Titulo:  {title}')
-		print('\n')
+    def parse(self, response, **kwargs):
+        title = response.css('h1 a::text').get()
+        top_tags = response.css('.tag-item .tag::text').getall()
 
-		print(f'Citas: ')
-		for quote in quotes:
-			print(f'  - {quote}')
-		print('\n\n')
+        quotes = response.css('.quote')
+        quotes_list = []
+        for quote in quotes:
+            quotes_list.append({
+                'text': quote.css('.text::text').get(),
+                'author': quote.css('.author::text').get(),
+                'tags': quote.css('.tags .tag::text').getall(),
+            })
 
-		print(f'Top ten tags: ')
-		for tag in top_tags:
-			print(f'  - {tag}')
+        yield {'title': title,
+               'top tags': top_tags,
+               }
 
-		print('\n\n')
-		print('*'*10)
+        next_page = response.css('.next a::attr(href)').get()
+        if next_page:
+            yield response.follow(next_page, callback=self.parse_quotes, cb_kwargs={'quotes': quotes_list})
+
+    def parse_quotes(self, response, **kwargs):
+        quotes = response.css('.quote')
+        quotes_list = []
+        for quote in quotes:
+            quotes_list.append({
+                'text': quote.css('.text::text').get(),
+                'author': quote.css('.author::text').get(),
+                'tags': quote.css('.tags .tag::text').getall(),
+            })
+
+        kwargs['quotes'].extend(quotes_list)
+
+        next_page = response.css('.next a::attr(href)').get()
+        if next_page:
+            yield response.follow(next_page, callback=self.parse_quotes, cb_kwargs=kwargs)
+        else:
+            yield kwargs
