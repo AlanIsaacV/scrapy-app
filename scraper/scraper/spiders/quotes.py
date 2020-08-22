@@ -17,24 +17,17 @@ class Quotes(scrapy.Spider):
         title = response.css('h1 a::text').get()
         top_tags = response.css('.tag-item .tag::text').getall()
 
-        quotes = response.css('.quote')
-        quotes_list = []
-        for quote in quotes:
-            quotes_list.append({
-                'text': quote.css('.text::text').get(),
-                'author': quote.css('.author::text').get(),
-                'tags': quote.css('.tags .tag::text').getall(),
-            })
-
-        yield {'title': title,
+        data = {'title': title,
                'top tags': top_tags,
+               'quotes': self.get_quotes(response)
                }
-
-        next_page = response.css('.next a::attr(href)').get()
-        if next_page:
-            yield response.follow(next_page, callback=self.parse_quotes, cb_kwargs={'quotes': quotes_list})
+        yield self.next_page(response, data)
 
     def parse_quotes(self, response, **kwargs):
+        kwargs['quotes'].extend(self.get_quotes(response))
+        yield self.next_page(response, kwargs)
+
+    def get_quotes(self, response):
         quotes = response.css('.quote')
         quotes_list = []
         for quote in quotes:
@@ -43,11 +36,12 @@ class Quotes(scrapy.Spider):
                 'author': quote.css('.author::text').get(),
                 'tags': quote.css('.tags .tag::text').getall(),
             })
+        return quotes_list
 
-        kwargs['quotes'].extend(quotes_list)
-
-        next_page = response.css('.next a::attr(href)').get()
-        if next_page:
-            yield response.follow(next_page, callback=self.parse_quotes, cb_kwargs=kwargs)
+    def next_page(self, response, data):
+        next_page_link = response.css('.next a::attr(href)').get()
+        if next_page_link:
+            return response.follow(next_page_link, callback=self.parse_quotes, cb_kwargs=data)
         else:
-            yield kwargs
+            return data
+
