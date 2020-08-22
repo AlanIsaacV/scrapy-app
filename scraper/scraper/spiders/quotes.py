@@ -17,10 +17,13 @@ class Quotes(scrapy.Spider):
         title = response.css('h1 a::text').get()
         top_tags = response.css('.tag-item .tag::text').getall()
 
+        top = getattr(self, 'top', None)
+        top_tags = top_tags[:int(top)] if top else top_tags
+
         data = {'title': title,
-               'top tags': top_tags,
-               'quotes': self.get_quotes(response)
-               }
+                'top tags': top_tags,
+                'quotes': self.get_quotes(response)
+                }
         yield self.next_page(response, data)
 
     def parse_quotes(self, response, **kwargs):
@@ -44,4 +47,3 @@ class Quotes(scrapy.Spider):
             return response.follow(next_page_link, callback=self.parse_quotes, cb_kwargs=data)
         else:
             return data
-
